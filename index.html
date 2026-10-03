@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Caça ao Alvo</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body { 
+      margin: 0; 
+      background: #1c1c1e; 
+      color: #fff; 
+      font-family: Arial, sans-serif;
+      text-align: center; 
+      user-select: none; 
+      overflow: hidden; 
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+    }
+    #alvo { 
+      position: absolute; 
+      width: 80px; 
+      height: 80px; 
+      border-radius: 50%;
+      background: radial-gradient(circle, #ff4444, #aa0000); 
+      cursor: pointer;
+      box-shadow: 0 0 15px rgba(255, 68, 68, 0.6);
+      transition: transform 0.1s;
+    }
+    #alvo:active {
+      transform: scale(0.9);
+    }
+    #hud { 
+      position: absolute; 
+      top: 20px; 
+      width: 100%; 
+      display: flex;
+      justify-content: space-around; 
+      font-size: 20px; 
+      font-weight: bold;
+      z-index: 10;
+      pointer-events: none; /* Impede que o HUD bloqueie cliques no alvo */
+    }
+    #inicio, #fim { 
+      position: absolute; 
+      top: 50%; 
+      left: 50%;
+      transform: translate(-50%, -50%); 
+      background: rgba(0, 0, 0, 0.9);
+      padding: 30px; 
+      border-radius: 15px; 
+      width: 80%;
+      max-width: 320px;
+      z-index: 20;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h2 { margin-top: 0; }
+    button { 
+      background: #2ea6ff; 
+      color: #fff; 
+      border: none; 
+      padding: 12px 24px;
+      font-size: 18px; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      font-weight: bold;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:active { background: #1a8cd8; }
+    .btn-secundario {
+      background: #444;
+      margin-top: 5px;
+    }
+    .btn-secundario:active { background: #333; }
+  </style>
+</head>
+<body>
+  <!-- Placar e Tempo -->
+  <div id="hud">
+    <div>⏱ <span id="tempo">30</span>s</div>
+    <div>🎯 <span id="pontos">0</span></div>
+  </div>
+
+  <!-- O Alvo -->
+  <div id="alvo" style="display:none;"></div>
+
+  <!-- Tela de Início -->
+  <div id="inicio">
+    <h2>🎯 Caça ao Alvo</h2>
+    <p>Toque nos alvos o mais rápido possível!</p>
+    <button onclick="comecar()">Jogar</button>
+  </div>
+
+  <!-- Tela de Fim de Jogo -->
+  <div id="fim" style="display:none;">
+    <h2>Fim de Jogo!</h2>
+    <p>Pontuação: <span id="pontosFim">0</span></p>
+    <button onclick="comecar()">Jogar de Novo</button>
+    <button class="btn-secundario" onclick="voltarInicio()">Voltar ao Início</button>
+  </div>
+
+<script>
+  // ====== CONFIGURAÇÃO DO TELEGRAM WEB APP ======
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();   // Avisa o Telegram que o app carregou
+    tg.expand();  // Faz o app ocupar a tela inteira
+  }
+
+  // ====== VARIÁVEIS DO JOGO ======
+  let pontos = 0, tempo = 30, timer, jogando = false;
+  const alvo = document.getElementById('alvo');
+  const elTempo = document.getElementById('tempo');
+  const elPontos = document.getElementById('pontos');
+  const inicio = document.getElementById('inicio');
+  const fim = document.getElementById('fim');
+
+  // ====== LÓGICA DO JOGO ======
+  function moverAlvo() {
+    // Calcula posição aleatória, evitando o topo (HUD) e as bordas
+    const margemTopo = 80; // Evita o placar
+    const tamanhoAlvo = 80;
+    
+    const maxX = window.innerWidth - tamanhoAlvo;
+    const maxY = window.innerHeight - tamanhoAlvo - margemTopo;
+    
+    alvo.style.left = Math.random() * maxX + 'px';
+    alvo.style.top = (Math.random() * maxY + margemTopo) + 'px';
+  }
+
+  function comecar() {
+    pontos = 0; 
+    tempo = 30; 
+    jogando = true;
+    
+    elPontos.textContent = 0; 
+    elTempo.textContent = 30;
+    
+    inicio.style.display = 'none'; 
+    fim.style.display = 'none';
+    alvo.style.display = 'block'; 
+    
+    moverAlvo();
+
+    clearInterval(timer);
+    timer = setInterval(() => {
+      tempo--; 
+      elTempo.textContent = tempo;
+      if (tempo <= 0) encerrar();
+    }, 1000);
+  }
+
+  function encerrar() {
+    jogando = false; 
+    clearInterval(timer);
+    alvo.style.display = 'none';
+    
+    document.getElementById('pontosFim').textContent = pontos;
+    fim.style.display = 'block';
+
+    // Envia a pontuação para o bot do Telegram (opcional)
+    if (tg) {
+      tg.sendData(JSON.stringify({ pontuacao: pontos }));
+    }
+  }
+
+  function voltarInicio() {
+    fim.style.display = 'none';
+    inicio.style.display = 'block';
+  }
+
+  // Evento de clique no alvo
+  alvo.addEventListener('click', (e) => {
+    e.preventDefault(); // Evita zoom/scroll no mobile
+    if (!jogando) return;
+    pontos++; 
+    elPontos.textContent = pontos; 
+    moverAlvo();
+  });
+
+  // Previne o comportamento padrão de arrastar na tela
+  document.addEventListener('touchmove', (e) => {
+    if (jogando) e.preventDefault();
+  }, { passive: false });
+</script>
+</body>
+</html>
